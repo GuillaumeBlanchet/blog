@@ -47,3 +47,34 @@ pour plusieurs raisons:
 - jsforce est maintenu par Salesforce contrairement à d'autres wrappers dans les autres langages de programmation important (exemple: https://github.com/simple-salesforce/simple-salesforce)
 - la documentation est supérieure aux autres wrapper, car vous avez [un site dédiée à la doc de jsforce](https://jsforce.github.io/)
 
+### Exemple de code Jsforce
+
+Jsforce aura besoin d'un "security token" et non seulement de votre mot de passe pour se connecter à votre instance Salesforce.
+Dirigez-vous dans "Setup":
+![settings](img/settings.png)
+Puis ensuite créez-vous un token de sécurité:
+![img.png](img/security-token.png)
+
+Voici un exemple de code qui va chercher les contacts dans la base de données Salesforce:
+
+```
+var jsforce = require('jsforce');
+var username = '<email>';
+var securityToken = '<security-token>';
+var password = '<password>';
+var conn = new jsforce.Connection({
+    loginUrl : 'https://guillaumeblanchet-dev-ed.develop.my.salesforce.com'
+});
+conn.login(username, password + securityToken, function(err, res) {
+    conn.query('SELECT Id, Name FROM Account', function(err, res) {
+        console.log(res);
+    });
+});
+```
+
+Vous devriez avoir quelque chose comme ceci dans votre console:
+
+![contacts.png](img/contacts.png)
+
+Comme vous pouvez voir, l'API retourne des informations pour que vous paginiez les requêtes.
+
