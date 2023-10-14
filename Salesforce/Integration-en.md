@@ -110,21 +110,89 @@ you can consult the documentation for NodeJS here: https://firebase.google.com/d
 Note the `autoFetch` functionality, which allows for automatic query pagination and demonstrates the utility
 of choosing your wrapper well before integrating with Salesforce (or any other system).
 
+### Executing Periodic Synchronization
+
+Of course, you could place the small script above into an Azure Function, an AWS Lambda, or even
+a cloud function directly in Firebase to execute it at regular intervals.
+
+Personally, I prefer using a devops job. Indeed, the idea is to continue to benefit from powerful
+platforms that do more for us. This is the
+case for Devops platforms like Azure Devops, Gitlab, or Github Actions. These platforms do not limit you
+in the number of programming languages supported. They offer you a wide range of operating systems to
+run your code. They have extremely mature and central interfaces to their core business. They are truly
+the best cloud orchestrators on the market, even though they are better known for performing compilation and
+deployment tasks.
+
+For example, here is a Github Action job that synchronizes your data at midnight every day (see the documentation for
+all supported schedule types: [GitHub Docs](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule)):
+
+```yaml
+name: Node.js CI
+on:
+  schedule:
+    - cron: '0 0 * * *' # Run every day at midnight UTC
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./Salesforce
+    strategy:
+      matrix:
+        node-version: [14.x, 16.x, 18.x]
+        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: ./Salesforce/package-lock.json
+      - run: npm ci
+      - shell: bash
+        env:
+          SF_PWD: ${{ secrets.SF_PWD }}
+          SF_SECURITY_TOKEN: ${{ secrets.SF_SECURITY_TOKEN }}
+          TEST: 'it works!!'
+        run: |
+          node get-contact.js
+```
+
+Github provides access to all synchronization logs made at midnight and you have the ability to retrigger failed jobs
+and manage them:
+
+![logs](img/sync-github-action.png)
+
+Devops platforms also [provide you with OpenId Connect (OIDC) integrations to avoid managing
+secrets (here your password and the security token)](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect), which cloud functions do not offer.
+
+Devops platforms will also guide you to identify synchronization issues by associating new failed jobs
+with the recently committed faulty code. Github will even soon offer you intelligent assistants (bots) to support you
+in this debugging.
+
+You can also manage access and permissions of pipelines very precisely.
+
 ## Conclusion
 
-You now have the tools to synchronize your Salesforce data with your system. If the load becomes
-too large in your synchronizations, you can revert to custom pagination to load data batches into your
-database with a "bulk insert" strategy. For Firebase this could be something like this:
+You now have the tools to synchronize your Salesforce data with your system:
+
+- you have learned to use the Salesforce CLI to test your queries;
+- you have learned to use the Jsforce wrapper to program your synchronization;
+- you have learned to use Devops platforms to orchestrate your synchronization.
+
+If the load becomes too high in your synchronizations, you can revert to custom pagination
+to load data batches into your
+database with a "bulk insert" strategy. For firebase, it could be something like this:
 
 ```javascript
 firebase.database().ref('account').set(records);
 ```
-Which means replacing the entire contact data table at once for the `records` list given as a parameter.
+This is equivalent to replacing the entire contact data table at once for an initial batch of `records` as a parameter.
 
-Note that we have only dealt with synchronization to your system and not to Salesforce. If we wanted
-to push new data to Salesforce this time, we could also use the same wrapper, as Jsforce offers
-a "bulk insert" functionality to efficiently push several entries for large systems:
-https://jsforce.github.io/document/#bulk-api.
+Note that we have only discussed synchronization towards your system and not towards Salesforce. If we wanted
+to push new data towards Salesforce this time, we could use the same wrapper, because Jsforce offers
+a "bulk insert" feature to push multiple entries efficiently for large systems: [Jsforce Documentation](https://jsforce.github.io/document/#bulk-api).
 
 ## References
 

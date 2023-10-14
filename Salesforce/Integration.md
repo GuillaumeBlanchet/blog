@@ -109,16 +109,87 @@ vous pouvez consulter la documentation pour NodeJS ici: https://firebase.google.
 Vous pouvez noter la fonctionalité `autoFetch` qui permet de paginer automatiquement les requêtes et qui démontre l'utilité
 de bien choisir son wrapper avant de s'intégrer avec Salesforce (ou tout autre système).
 
+### Exécution de la synchronisation périodique
+
+Vous pourriez bien sûr mettre le petit script ci-dessus dans une Azure Function, une AWS Lambda ou encore
+une cloud function directement dans Firebase pour l'exécuter à intervalles réguliers. 
+
+Personnellement, je préfère utiliser une job devops. En effet, l'idée est de continuer de profiter de puissantes 
+plateformes qui en font plus pour nous. C'est le 
+cas des plateformes Devops comme Azure Devops, Gitlab ou encore Github Actions. Ces plateformes ne vous limitent pas 
+dans la quantité de langages de programmation supportés. Elle vous offre un large éventail de système d'exploitation pour
+exécuter votre code. Elles ont des interfaces extrêmement matures et centrales à leur core business. Ce sont en vérité
+les meilleurs orchestrateurs clouds sur le marché, même s'ils sont mieux connus pour l'exécution de tâches de compilation et
+de déploiement.
+
+Par exemple, voici une job Github Action qui synchronise votre données à minuit tous les jours (voir la documentation pour 
+tous les types cédules supportées: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule):
+
+```
+name: Node.js CI
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Run every day at midnight UTC
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./Salesforce
+    strategy:
+      matrix:
+        node-version: [14.x, 16.x, 18.x]
+        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+    steps:
+    - uses: actions/checkout@v3
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: ./Salesforce/package-lock.json
+    - run: npm ci
+    - shell: bash
+      env:
+        SF_PWD: ${{ secrets.SF_PWD }}
+        SF_SECURITY_TOKEN: ${{ secrets.SF_SECURITY_TOKEN }}
+        TEST: 'it works!!'
+      run: |
+        node get-contact.js
+```
+
+Github donne accès à tous les logs de synchronisation fait à minuit et vous avez la possibilité de redéclencher des jobs 
+en échec et de les gérer :
+
+![logs](img/sync-github-action.png)
+
+Les plateformes Devops vous [offrent également des intégrations OpenId Connect (OIDC) pour vous éviter de gérer les 
+secrets (ici votre mot de passe et le security token)](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect), ce que les fonctions cloud n'offrent pas.
+
+Les plateformes devops vont aussi vous guider à identifier les problèmes de synchronisation en associant les nouvelles jobs en échec
+au code récemment commité fautif. Github vous offrira même bientôt des assistants intelligents (bot) pour vous épauler 
+dans ce débogage.
+
+Vous pouvez également gérer l'accès et les permissions des pipelines de façon très précise.
+
 ## Conclusion
 
-Vous avez maintenant les outils pour synchroniser vos données Salesforce avec votre système. Si la charge devient 
-trop importante dans vos synchronisations, vous pourrez retourner à une pagination personnalisée pour charger dans votre
-base des lots de données avec un stratégie "bulk insert". Pour firebase ce pourrait être quelque chose comme ceci:
+Vous avez maintenant les outils pour synchroniser vos données Salesforce avec votre système:
+
+- vous avez appris à utiliser le CLI Salesforce pour tester vos requêtes;
+- vous avez appris à utiliser le wrapper Jsforce pour programmer votre synchronisation;
+- vous avez appris à utiliser les plateformes Devops pour orchestrer votre synchronisation.
+
+Si la charge devient trop importante dans vos synchronisations, vous pourrez retourner à une pagination personnalisée 
+pour charger dans votre
+base des lots de données avec une stratégie "bulk insert". Pour firebase ce pourrait être quelque chose comme ceci :
 
 ```
 firebase.database().ref('account').set(records);
 ```
-Ce qui revient à remplacer la table de données contact au complet et d'un coup pour la liste `records` données en paramètre. 
+Ce qui revient à remplacer la table de données contact au complet et d'un coup pour un premier lot de `records` en paramètre. 
 
 Notez que nous avons traité seulement de la synchronisation vers votre système et non vers Salesforce. Si nous voulions 
 pousser de la donnée nouvelle vers Salesforce cette fois, nous pourrions utiliser le même wrapper, car Jsforce offre
