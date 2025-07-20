@@ -1,0 +1,22 @@
+# Tells Multipass to sync the package list and upgrade the packages
+package_update: true
+package_upgrade: true
+
+# Tells Multipass to create a default user
+users:
+  - default
+
+# Tells Multipass to set the password for the default user
+chpasswd:
+  list: |
+    ubuntu:yourpassword # Change this to your password
+  expire: False
+
+# Tells Multipass to install the packages needed for the desktop environment
+packages:
+  - xrdp
+  - ubuntu-desktop
+
+## Feel free to add commands here to be run after the vm is started:
+# runcmd:
+#   - echo 'vm is started'
